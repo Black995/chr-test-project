@@ -1,0 +1,6 @@
+django
+urllib3
+djangorestframework
+markdown
+django-filter
+psycopg2-binary
