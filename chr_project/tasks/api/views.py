@@ -1,12 +1,23 @@
-from datetime import datetime
+from datetime import datetime, date
 import urllib3
 import json
-from django.http import JsonResponse, HttpResponse
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select #este lo estoy probando
 
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+
+from django.http import JsonResponse, HttpResponse
 from rest_framework.response import Response
 from rest_framework.generics import (ListAPIView, ListCreateAPIView)
 from tasks.models import Network, Location, Station, Extra
-from .serializers import (LocationSerializer, NetworkSerializer, StationSerializer, ExtraSerializer)
+from .serializers import (LocationSerializer, NetworkSerializer, StationSerializer, ExtraSerializer, SeiaSeaSerializer)
+
+
 
 
 """
@@ -129,3 +140,61 @@ class CreateBikesSantiago(ListCreateAPIView):
         return Response({"mensaje": "data saved successfully."})
 
 
+# receive the date directly from the scrapper and transforms it to a format compatible for the db.
+def format_date_to_db(unformatted_date):
+    if '-' in unformatted_date:
+        complete_date = unformatted_date.split('-')
+    elif '/' in unformatted_date:
+        complete_date = unformatted_date.split('/')
+    date_day, date_month, date_year = int(complete_date[0]), int(complete_date[1]), int(complete_date[2])
+    return date(date_year, date_month, date_day)
+
+
+"""
+    Vista para prueba de acceso al portal seia.sea.gob
+"""
+class ListSeiaSeaGob(ListCreateAPIView):
+    model = Network
+    queryset = Network.objects.all()
+
+    def create(self, request):
+
+        # En primer lugar, accedemos a la página para obtener los valores de la paginación
+        chrome_driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        chrome_driver.get('https://seia.sea.gob.cl/busqueda/buscarProyectoAction.php')
+        xpath_select = f"//select[@name='pagina_offset']"
+        select = Select(chrome_driver.find_element(By.XPATH, xpath_select))
+
+        xpath_table = f"//table[@class='tabla_datos']"
+        table = []
+        for index in range(len(select.options)):
+
+            # Seleccionado elemento del select
+            WebDriverWait(chrome_driver, 15).until(ec.visibility_of_element_located((By.XPATH, xpath_select)))
+            select = Select(chrome_driver.find_element(By.XPATH, xpath_select))
+            select.select_by_index(index)
+
+            # Obtenemos la tabla para iterar sobre sus datos
+            WebDriverWait(chrome_driver, 15).until(ec.visibility_of_element_located((By.XPATH, xpath_table)))
+            current_table = chrome_driver.find_element(By.XPATH, xpath_table)
+            rows = current_table.find_elements(By.TAG_NAME, 'tr')
+
+            for row in rows: 
+                col = row.find_elements(By.TAG_NAME,'td')            
+                if(len(col) > 1):
+                    seia = {
+                        "nombre": col[1].text,
+                        "tipo": col[2].text,
+                        "region": col[3].text,
+                        "tipologia": col[4].text,
+                        "titular": col[5].text,
+                        "inversion": float(col[6].text.replace(',', '.').replace('.', '')),
+                        "fecha_ingreso": format_date_to_db(col[7].text),
+                        "estado": col[8].text
+                    }
+                    serializer_seia = SeiaSeaSerializer(data=seia)
+                    serializer_seia.is_valid(raise_exception=True)
+                    serializer_seia.save()
+                    table.append(seia)
+
+        return Response({"data": table})

@@ -77,3 +77,15 @@ class Extra(models.Model):
     slots = models.IntegerField(default=0)
     station = models.OneToOneField(Station, null=True,
                                         related_name='station_extra', on_delete=models.SET_NULL)
+
+
+
+class SeiaSea(models.Model):
+    nombre = models.CharField(max_length=500)
+    tipo = models.CharField(max_length=10)
+    region = models.CharField(max_length=50)
+    tipologia = models.CharField(max_length=10)
+    titular = models.CharField(max_length=200)
+    inversion = models.FloatField(default=0)    
+    fecha_ingreso = models.DateField()
+    estado = models.CharField(max_length=50)

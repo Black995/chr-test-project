@@ -1,4 +1,4 @@
-from tasks.models import Location, Network, Station, Extra
+from tasks.models import Location, Network, Station, Extra, SeiaSea
 from rest_framework import serializers
 from django.db.models import F, Q
 
@@ -67,4 +67,20 @@ class ExtraSerializer(serializers.ModelSerializer):
             "returning",
             "slots",
             "station"
+        ]
+
+
+class SeiaSeaSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = SeiaSea
+        fields = [
+            "nombre",
+            "tipo",
+            "region",
+            "tipologia",
+            "titular",
+            "inversion",
+            "fecha_ingreso",
+            "estado",
         ]
